@@ -1,0 +1,28 @@
+ref callback
+ref beverage
+ref withdrawal
+array_var entry
+array_var ingestibles
+begin Function {}
+ if eval !(IsModLoaded "TTWVRAlcohol.esp")
+  return
+ endif
+ let callback := CompileScript "TTWVRAlcohol/Drink.txt"
+ if eval !callback
+  return
+ endif
+
+ ; Recognize drinks added by other plugins from their winning addiction record.
+ let withdrawal := GetFormFromMod "FalloutNV.esm" "06698C"
+ let ingestibles := GetLoadedTypeArray 47
+ foreach entry <- ingestibles
+  let beverage := entry["value"]
+  if eval withdrawal && (GetAddictionEffect beverage) == withdrawal
+   SetOnUseAidItemEventHandler callback 1 beverage
+  endif
+ loop
+
+ ; The packager inserts the known serving sizes here. The temporary lookup
+ ; belongs to JIP and never changes a beverage's records or active effects.
+ ; @servings
+end

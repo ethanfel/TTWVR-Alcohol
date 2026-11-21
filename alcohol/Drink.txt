@@ -1,0 +1,18 @@
+ref beverage
+float units
+float soberDay
+begin Function {beverage}
+ if eval GetSelf != player
+  return
+ endif
+ let units := AuxVarGetFlt "*_TTWVRAlcoholUnits" 0 beverage
+ if eval units <= 0
+  let units := 2
+ endif
+ let soberDay := player.AuxVarGetFlt "_TTWVRAlcoholSoberDay" 0
+ if eval soberDay < GameDaysPassed
+  let soberDay := GameDaysPassed
+ endif
+ let soberDay := soberDay + units / 24.0
+ player.AuxVarSetFlt "_TTWVRAlcoholSoberDay" soberDay 0
+end
