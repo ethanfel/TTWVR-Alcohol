@@ -54,6 +54,22 @@ inline int intervalSeconds(const char *minutes) {
 struct DrinkTiming {
     int saveReady = 0;
     int soberAt = 0;
+    int observedAt = 0;
+
+    // Preserve the remaining durations if the wall clock goes backwards.
+    // Older saves store only deadlines. The saving sip that set saveReady
+    // happened one cooldown earlier, so time cannot precede that sip.
+    bool observeClock(int now, int interval) {
+        const int anchor = observedAt ? observedAt : std::max(0, saveReady - interval);
+        observedAt = now;
+        if (now >= anchor) return false;
+        const auto rebase = [=](int deadline) {
+            return deadline > anchor ? now + (deadline - anchor) : 0;
+        };
+        saveReady = rebase(saveReady);
+        soberAt = rebase(soberAt);
+        return true;
+    }
 
     int wait(int now) const { return std::max(0, saveReady - now); }
     int effect(int now, int interval) const {
@@ -67,6 +83,7 @@ struct DrinkTiming {
     }
 
     void drink(int now, int interval, bool saved) {
+        observeClock(now, interval);
         const auto later = [interval](int start) {
             return static_cast<int>(std::min<long long>(
                 std::numeric_limits<int>::max(), static_cast<long long>(start) + interval));

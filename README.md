@@ -4,11 +4,13 @@ Alcohol in Fallout: New Vegas gradually blurs your vision, makes your aim drift,
 
 ## Install
 
-1. Start with TTWVR 1.1.7, xNVSE and JIP LN NVSE installed.
+1. Install TTWVR, xNVSE and JIP LN NVSE for Fallout: New Vegas.
 2. Download the **TTWVR-Alcohol** ZIP from the [latest release](https://github.com/ethanfel/TTWVR-Alcohol/releases/latest) and install it with your mod manager.
 3. Enable **TTWVRAlcohol.esp** and restart Fallout.
 
-Physical Canteen is optional. If you use version 0.1.16 or earlier of Physical Canteen, give Alcohol priority for their shared DLL.
+Physical Canteen is optional. Alcohol and Canteen **1.1.8-r1** ship the same DLL, so either can take priority. If you keep an older Canteen release, let Alcohol win the DLL conflict.
+
+In **1.1.8-r1**, `1.1.8` is the TTWVR version tested and `r1` is the Alcohol release number. The addon detects compatible OpenXR and OpenVR tracking interfaces at startup.
 
 ## Drink strength
 

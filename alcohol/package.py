@@ -60,7 +60,7 @@ def esp():
 
 def build():
     build_dir = ROOT / "build"
-    out = build_dir / "TTWVR-Alcohol-0.1.0.zip"
+    out = build_dir / "TTWVR-Alcohol-1.1.8-r1.zip"
     udf = "NVSE/user_defined_functions/TTWVRAlcohol"
     with ZipFile(out, "w", ZIP_DEFLATED) as archive:
         archive.write(build_dir / "TTWVRPhysicalCanteen.dll", "NVSE/Plugins/TTWVRPhysicalCanteen.dll")

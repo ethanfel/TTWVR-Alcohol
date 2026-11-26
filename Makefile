@@ -16,6 +16,9 @@ build:
 $(RUNTIME): src/Plugin.cpp src/Tracking.cpp $(HEADERS) | build
 	$(WINCXX) $(FLAGS) -I$(OPENXR_HEADERS) -static -shared -s src/Plugin.cpp src/Tracking.cpp -o $@
 
+build/test-host.exe: tests/HostIntegration.cpp src/Tracking.cpp $(HEADERS) | build
+	$(WINCXX) $(FLAGS) -I$(OPENXR_HEADERS) -static -municode tests/HostIntegration.cpp src/Tracking.cpp -o $@
+
 build/test-%: tests/%.cpp $(HEADERS) | build
 	$(CXX) $(FLAGS) -I$(OPENXR_HEADERS) $< -o $@
 

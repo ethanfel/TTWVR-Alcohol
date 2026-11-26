@@ -10,6 +10,7 @@
 #include "Torso.h"
 
 namespace canteen {
+void prepareDrift();
 unsigned installDrift();
 void publishMotion(float amount,bool firearm,bool viewSway);
 unsigned appliedViewBackends();
@@ -154,7 +155,7 @@ constexpr char release[] = R"(begin Function {}
  endif
 end)";
 
-// JIP stores the two public player auxiliary values in the NVSE co-save.
+// JIP stores both deadlines and the clock at save time in the NVSE co-save.
 // Absolute deadlines also expire while Fallout is closed.
 constexpr char readDeadline[] = R"(int slot
 begin Function {slot}
@@ -162,11 +163,15 @@ begin Function {slot}
 end)";
 constexpr char writeDeadlines[] = R"(int readyAt
 int soberAt
+int observedAt
 int ok
-begin Function {readyAt soberAt}
+begin Function {readyAt soberAt observedAt}
  let ok := player.AuxVarSetFlt "_TTWVRPhysicalCanteenDeadlines" readyAt 0
  if ok
-  SetFunctionValue (player.AuxVarSetFlt "_TTWVRPhysicalCanteenDeadlines" soberAt 1)
+  let ok := player.AuxVarSetFlt "_TTWVRPhysicalCanteenDeadlines" soberAt 1
+  if ok
+   SetFunctionValue (player.AuxVarSetFlt "_TTWVRPhysicalCanteenDeadlines" observedAt 2)
+  endif
  endif
 end)";
 // 0.1.10 serialized its active abilities into the base save. Remove only our
@@ -289,28 +294,38 @@ int drinkClock() {
 
 void storeTiming() {
     Result result;
-    if (!scripts->call(putDeadlines,nullptr,nullptr,&result,2,timing.saveReady,timing.soberAt) ||
+    if (!scripts->call(putDeadlines,nullptr,nullptr,&result,3,timing.saveReady,timing.soberAt,timing.observedAt) ||
         result.type!=1 || result.value!=1) log("Could not persist canteen drinking deadlines");
+}
+
+void observeDrinkClock(int now) {
+    if (timing.observeClock(now,drinkInterval)) {
+        char line[120];
+        std::snprintf(line,sizeof(line),"canteen_clock_rebased cooldown_remaining=%d recovery_remaining=%d",
+                      timing.wait(now),std::max(0,timing.soberAt-now));
+        log(line);
+    }
 }
 
 void updateDrinking(int now) {
     if (!legacyClean && clearOldAbilities) legacyClean=run(clearOldAbilities)==1;
     if (!getDeadline || !putDeadlines) return;
     if (!timingLoaded) {
-        int values[2]{};
-        for (int slot=0;slot<2;++slot) {
+        int values[3]{};
+        for (int slot=0;slot<3;++slot) {
             Result r;
             if (!scripts->call(getDeadline,nullptr,nullptr,&r,1,slot) || r.type!=1 ||
                 !(r.value>=0 && r.value<=std::numeric_limits<int>::max())) return;
             values[slot]=static_cast<int>(r.value);
         }
-        timing={values[0],values[1]};
+        timing={values[0],values[1],values[2]};
         timingLoaded=true;
         if (!drinkingEnabled && (timing.saveReady || timing.soberAt)) {
             timing={};
             storeTiming();
         }
     }
+    if (drinkingEnabled) observeDrinkClock(now);
     targetStrength=drinkingEnabled ? timing.intensity(now,drinkInterval) : 0.f;
 }
 
@@ -453,8 +468,9 @@ void tick() {
             syncItems=scripts->compile(inventory);
             checkDrawn=scripts->compile(eligible);
             putAway=scripts->compile(release);
-            log(syncItems && checkDrawn && putAway ? "Physical Canteen 0.1.17 ready" : "Could not compile canteen scripts");
+            log(syncItems && checkDrawn && putAway ? "Physical Canteen 1.1.8-r1 ready" : "Could not compile canteen scripts");
         }
+        canteen::prepareDrift();
         initDrinking();
         char value[3]{};
         trace=GetEnvironmentVariableA("TTWVR_CANTEEN_TRACE",value,sizeof(value))==1 && value[0]=='1';
@@ -533,6 +549,7 @@ void tick() {
     }
     if (!sip.sample(now,m.distance,m.up) || requested[0]) return;
     const int at=drinkClock();
+    if (drinkingEnabled && timingLoaded) observeDrinkClock(at);
     const int remaining=drinkingEnabled && timingLoaded ? timing.wait(at) : 0;
     if (remaining>0) {
         countDrink(at,false);
@@ -570,6 +587,10 @@ void __cdecl message(Message *m) {
                 // NVSE dispatches this before JIP writes the co-save. Only a
                 // matching save can start a new cooldown.
                 if (drinkingEnabled && timingLoaded) countDrink(drinkClock(),true);
+            } else if (loaded && drinkingEnabled && timingLoaded && (timing.saveReady || timing.soberAt)) {
+                // Stamp ordinary saves too, including ones made after recovery.
+                observeDrinkClock(drinkClock());
+                storeTiming();
             }
             break;
         case 20: tick(); break;
@@ -578,7 +599,7 @@ void __cdecl message(Message *m) {
 }
 extern "C" __declspec(dllexport) bool NVSEPlugin_Query(const NVSE *n, Info *p) {
     if (!n || !p) return false;
-    *p={1,"TTWVR Physical Canteen",18};
+    *p={1,"TTWVR Physical Canteen",1010801};
     return !n->isEditor && n->runtime==0x040020d0 && n->version>=6;
 }
 extern "C" __declspec(dllexport) bool NVSEPlugin_Load(const NVSE *n) {

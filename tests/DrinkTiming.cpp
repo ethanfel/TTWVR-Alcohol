@@ -28,7 +28,47 @@ static void testRefocusing() {
     assert(starts.size()>4 && depths.size()>3);
 }
 
+static void testRestoredClock() {
+    using canteen::DrinkTiming;
+    constexpr int interval = 300;
+    constexpr int earlierPC = 217425900;
+    // Actual two-slot values from the two legacy Police HQ co-saves.
+    for (int deadline : {217445369, 217444872}) {
+        DrinkTiming legacy{deadline, deadline};
+        assert(legacy.observeClock(earlierPC,interval));
+        assert(legacy.wait(earlierPC)==interval);
+        assert(legacy.intensity(earlierPC,interval)==0.f && legacy.effect(earlierPC,interval)==0);
+        assert(!legacy.observeClock(earlierPC+interval,interval));
+        assert(legacy.wait(earlierPC+interval)==0);
+        DrinkTiming normal{deadline, deadline};
+        assert(!normal.observeClock(deadline-275,interval));
+        assert(normal.wait(deadline-275)==275 && normal.intensity(deadline-275,interval)==0.f);
+    }
+
+    // More drinks can legitimately stack hours of recovery. Only the clock
+    // shift should be removed, with the exact amount retained for new saves.
+    DrinkTiming stacked{1300, 1000+80*interval, 1250};
+    const int debt=stacked.soberAt-stacked.observedAt;
+    assert(stacked.observeClock(850,interval));
+    assert(stacked.wait(850)==50 && stacked.soberAt-850==debt);
+    assert(!stacked.observeClock(850,interval));
+    assert(!stacked.observeClock(910,interval));
+    assert(stacked.observeClock(310,interval));
+    assert(stacked.wait(310)==0 && stacked.soberAt-310==debt-60);
+
+    DrinkTiming legacyDrunk{1300,1900};
+    assert(legacyDrunk.observeClock(850,interval));
+    assert(legacyDrunk.wait(850)==300 && legacyDrunk.effect(850,interval)==2);
+    DrinkTiming expired{1300,1600,1700};
+    assert(expired.observeClock(1000,interval));
+    assert(expired.wait(1000)==0 && expired.intensity(1000,interval)==0.f);
+    DrinkTiming fresh;
+    assert(!fresh.observeClock(900,interval));
+    assert(fresh.wait(900)==0 && fresh.soberAt==0);
+}
+
 int main() {
+    testRestoredClock();
     testRefocusing();
     using namespace canteen;
     assert(intervalSeconds("5") == 300 && intervalSeconds("0.5") == 30);
